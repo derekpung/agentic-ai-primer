@@ -1,15 +1,59 @@
 version: "3.9"
 services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: dev.local
+      KC_PROXY: edge
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT: true
+      KC_HTTP_RELATIVE_PATH: /auth
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak-data:/opt/keycloak/data
+
   backend:
     build: ./backend
+    environment:
+      APP_JWT_SECRET: change-me
+      APP_JWT_EXPIRE_MIN: 60
+      KEYCLOAK_BASE: "http://nginx/auth"
+      KEYCLOAK_REALM: llm-app
+      KEYCLOAK_CLIENT_ID: llm-app
+      KEYCLOAK_CLIENT_SECRET: fX1IxurYDKRsU9OVsUpTVkGAHZTINkdD
+      KEYCLOAK_CALLBACK_URL: "http://dev.local/api/auth/callback"
+      REDIRECT_URL: "http://dev.local"
+      SESSION_SECRET: 4cb4b82e6319d5aca2854e2543161a5ad3bdebc176dd94394cccfc4fee0b938b
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend/src/agent-backend:/app
+    extra_hosts:
+      - "dev.local:host-gateway"
+
   frontend:
     build: ./frontend
     environment:
-      BACKEND_HOST: "backend"
-      BACKEND_PORT: "8000"
+      BACKEND_URL: "http://dev.local/api"
+      BACKEND_SVC: "http://nginx/api"
     ports:
       - "8501:8501"
     depends_on:
       - backend
+    volumes:
+      - ./frontend/src/streamlit-primer:/app
+
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+      - keycloak

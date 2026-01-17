@@ -1,16 +1,15 @@
-# backend.py
 from fastapi import FastAPI
-from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
+from auth.router import router as auth_router
+from llm.router import router as llm_router
+
+import os
 
 app = FastAPI()
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", ""),
+)
 
-
-class Prompt(BaseModel):
-    text: str
-
-
-@app.post("/generate")
-def generate(prompt: Prompt):
-    # response = run_llm(prompt.text)
-    response = f"You said '{prompt.text}'..."
-    return {"response": response}
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(llm_router, prefix="/llm", tags=["llm"])
